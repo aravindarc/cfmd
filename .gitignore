@@ -1,0 +1,24 @@
+# cfmd binary
+/cfmd
+/cfmd.exe
+/dist/
+
+# Credentials — never commit.
+.env
+.env.*
+!.env.example
+
+# Editor / OS junk
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Go build cache leftovers
+*.test
+*.out
+
+# Test coverage
+coverage.out
+coverage.html

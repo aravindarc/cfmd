@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          binary="cfmd${ext}"
+          mkdir -p dist
+          go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=${version}" \
+            -o "dist/${binary}" \
+            ./cmd/cfmd
+          # Package.
+          archive_name="cfmd-${GOOS}-${GOARCH}"
+          cp README.md dist/README.md
+          cp LICENSE dist/LICENSE 2>/dev/null || true
+          cd dist
+          if [ "$GOOS" = "windows" ]; then
+            zip "${archive_name}.zip" "${binary}" README.md $( [ -f LICENSE ] && echo LICENSE )
+            sha256sum "${archive_name}.zip" > "${archive_name}.zip.sha256"
+          else
+            tar czf "${archive_name}.tar.gz" "${binary}" README.md $( [ -f LICENSE ] && echo LICENSE )
+            sha256sum "${archive_name}.tar.gz" > "${archive_name}.tar.gz.sha256"
+          fi
+          rm -f "${binary}" README.md LICENSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cfmd-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: List artifacts
+        run: ls -la dist
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

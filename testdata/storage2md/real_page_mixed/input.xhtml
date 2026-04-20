@@ -1,0 +1,17 @@
+<h1>Payment Service Redesign</h1>
+<p>The payment service handles <strong>card</strong> and <em>bank</em> transfers. See <a href="https://example.com/spec">the spec</a>.</p>
+<h2>Status</h2>
+<ac:structured-macro ac:name="status"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">Launched</ac:parameter></ac:structured-macro>
+<h2>Configuration</h2>
+<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">yaml</ac:parameter><ac:plain-text-body><![CDATA[timeout: 30
+retries: 3
+]]></ac:plain-text-body></ac:structured-macro>
+<h2>Architecture</h2>
+<p><ac:image ac:alt="flow" ac:width="600"><ri:attachment ri:filename="flow.png"/></ac:image></p>
+<h2>Details</h2>
+<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">Implementation notes</ac:parameter><ac:rich-text-body><ul><li>Uses <strong>idempotency</strong> keys.</li><li>Retries on 5xx.</li></ul></ac:rich-text-body></ac:structured-macro>
+<h2>Callouts</h2>
+<ac:structured-macro ac:name="info"><ac:rich-text-body><p>Launching Q2.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="warning"><ac:parameter ac:name="title">Rollback needed</ac:parameter><ac:rich-text-body><p>Check the runbook.</p></ac:rich-text-body></ac:structured-macro>
+<h2>Team</h2>
+<table><tbody><tr><th>Name</th><th>Role</th></tr><tr><td>Alice</td><td>Eng</td></tr><tr><td>Bob</td><td>PM</td></tr></tbody></table>
