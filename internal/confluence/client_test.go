@@ -144,3 +144,80 @@ func TestNotFoundError_Classification(t *testing.T) {
 		t.Errorf("wanted ErrNotFound, got %v", err)
 	}
 }
+
+// TestBearerAuth_HeaderFormat verifies that in bearer mode the client sends
+// "Authorization: Bearer <token>" and does NOT base64-encode anything.
+func TestBearerAuth_HeaderFormat(t *testing.T) {
+	var captured string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"type":"known","displayName":"alice"}`))
+	}))
+	defer srv.Close()
+	cl := New(&config.Config{
+		BaseURL:        srv.URL,
+		Token:          "my-secret-pat-value",
+		AuthMode:       config.AuthModeBearer,
+		TimeoutSeconds: 5,
+	})
+	if _, err := cl.GetCurrentUser(context.Background()); err != nil {
+		t.Fatalf("%v", err)
+	}
+	want := "Bearer my-secret-pat-value"
+	if captured != want {
+		t.Errorf("auth header = %q, want %q", captured, want)
+	}
+}
+
+// TestBasicAuth_HeaderFormat verifies that in basic mode the client sends
+// "Authorization: Basic base64(user:token)" (the default behavior for Cloud).
+func TestBasicAuth_HeaderFormat(t *testing.T) {
+	var captured string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"type":"known","displayName":"alice"}`))
+	}))
+	defer srv.Close()
+	cl := New(&config.Config{
+		BaseURL:        srv.URL,
+		Username:       "alice@ex.com",
+		Token:          "secret",
+		AuthMode:       config.AuthModeBasic,
+		TimeoutSeconds: 5,
+	})
+	if _, err := cl.GetCurrentUser(context.Background()); err != nil {
+		t.Fatalf("%v", err)
+	}
+	// base64("alice@ex.com:secret") = "YWxpY2VAZXguY29tOnNlY3JldA=="
+	want := "Basic YWxpY2VAZXguY29tOnNlY3JldA=="
+	if captured != want {
+		t.Errorf("auth header = %q, want %q", captured, want)
+	}
+}
+
+// TestDefaultAuth_IsBasic verifies backward compatibility: when AuthMode is
+// not set, the client behaves exactly as v0.1.0 did (Basic auth).
+func TestDefaultAuth_IsBasic(t *testing.T) {
+	var captured string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	cl := New(&config.Config{
+		BaseURL:        srv.URL,
+		Username:       "u",
+		Token:          "t",
+		TimeoutSeconds: 5,
+		// AuthMode intentionally unset.
+	})
+	if _, err := cl.GetCurrentUser(context.Background()); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(captured) < 6 || captured[:6] != "Basic " {
+		t.Errorf("default should be Basic, got %q", captured)
+	}
+}

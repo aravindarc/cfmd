@@ -50,7 +50,25 @@ type Config struct {
 	// if set via CFMD_ALLOW_INSECURE_TLS=true; never enable unless you know
 	// what you're doing.
 	AllowInsecureTLS bool
+
+	// AuthMode selects the HTTP auth scheme.
+	//
+	//   "basic"  (default) — Authorization: Basic base64(username:token).
+	//                       Use this for Atlassian Cloud API tokens.
+	//   "bearer"           — Authorization: Bearer token. Username is unused.
+	//                       Use this for Confluence Data Center / Server
+	//                       Personal Access Tokens (PATs) created under
+	//                       Profile → Personal Access Tokens.
+	//
+	// Controlled by the CFMD_AUTH_MODE env var.
+	AuthMode string
 }
+
+// AuthMode constants.
+const (
+	AuthModeBasic  = "basic"
+	AuthModeBearer = "bearer"
+)
 
 // Load reads config from process env, overlaying values from ./.env where
 // the process env is not set. Applies defaults for anything still empty.
@@ -88,6 +106,14 @@ func Load() (*Config, error) {
 		cfg.AllowInsecureTLS = b
 	}
 
+	cfg.AuthMode = strings.ToLower(strings.TrimSpace(os.Getenv("CFMD_AUTH_MODE")))
+	if cfg.AuthMode == "" {
+		cfg.AuthMode = AuthModeBasic
+	}
+	if cfg.AuthMode != AuthModeBasic && cfg.AuthMode != AuthModeBearer {
+		return nil, fmt.Errorf("CFMD_AUTH_MODE must be 'basic' or 'bearer', got %q", cfg.AuthMode)
+	}
+
 	if cfg.CacheDir == "" {
 		cfg.CacheDir = defaultCacheDir()
 	}
@@ -96,13 +122,14 @@ func Load() (*Config, error) {
 }
 
 // RequireAuth returns an error if any field required to talk to Confluence
-// is missing.
+// is missing. In bearer mode, CFMD_USERNAME is optional; in basic mode it is
+// required (Atlassian Cloud uses email:token).
 func (c *Config) RequireAuth() error {
 	var missing []string
 	if c.BaseURL == "" {
 		missing = append(missing, "CFMD_BASE_URL")
 	}
-	if c.Username == "" {
+	if c.AuthMode == AuthModeBasic && c.Username == "" {
 		missing = append(missing, "CFMD_USERNAME")
 	}
 	if c.Token == "" {
@@ -199,22 +226,35 @@ func defaultCacheDir() string {
 func DotEnvTemplate() string {
 	return `# cfmd configuration. Keep this file OUT OF VERSION CONTROL.
 # It contains an API token.
+#
+# --- Pick ONE of the two setups below based on where your Confluence is hosted.
 
-# Your Confluence Cloud wiki URL (no trailing slash).
-CFMD_BASE_URL=https://yourco.atlassian.net/wiki
+# --- Atlassian Cloud (the *.atlassian.net variety) ------------------------
+# Base URL MUST include the /wiki path.
+# Token: create at https://id.atlassian.com/manage-profile/security/api-tokens
+# Auth:  HTTP Basic with account email + token.
+#
+#CFMD_BASE_URL=https://yourco.atlassian.net/wiki
+#CFMD_USERNAME=you@company.com
+#CFMD_TOKEN=<Cloud API token>
+#CFMD_AUTH_MODE=basic
 
-# Account email for Basic auth.
-CFMD_USERNAME=you@company.com
+# --- Confluence Data Center / Server (self-hosted) -------------------------
+# Base URL is your install URL, e.g. https://wiki.company.com
+# or https://wiki.company.com/confluence if installed under a context path.
+# Token: create inside Confluence at Profile → Personal Access Tokens.
+# Auth:  HTTP Bearer. Username is unused.
+#
+CFMD_BASE_URL=https://wiki.company.com/confluence
+CFMD_USERNAME=
+CFMD_TOKEN=<Data Center PAT>
+CFMD_AUTH_MODE=bearer
 
-# API token created at
-# https://id.atlassian.com/manage-profile/security/api-tokens
-CFMD_TOKEN=
-
-# Optional defaults used when a file's frontmatter omits them.
+# --- Optional defaults used when a file's frontmatter omits them ----------
 #CFMD_DEFAULT_SPACE=ENG
 #CFMD_DEFAULT_PARENT_ID=123456
 
-# Optional tuning.
+# --- Optional tuning -------------------------------------------------------
 #CFMD_TIMEOUT_SECONDS=30
 #CFMD_CACHE_DIR=~/.cache/cfmd
 `

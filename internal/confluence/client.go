@@ -21,11 +21,12 @@ import (
 	"github.com/aravindarc/cfmd/internal/config"
 )
 
-// Client talks to a Confluence Cloud site.
+// Client talks to a Confluence Cloud or Data Center site.
 type Client struct {
 	baseURL    string
 	username   string
 	token      string
+	authMode   string // config.AuthModeBasic or config.AuthModeBearer
 	httpClient *http.Client
 
 	// Verbose, if true, logs request/response summaries to stderr (never the
@@ -44,15 +45,29 @@ func New(cfg *config.Config) *Client {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 	}
+	mode := cfg.AuthMode
+	if mode == "" {
+		mode = config.AuthModeBasic
+	}
 	return &Client{
 		baseURL:    cfg.BaseURL,
 		username:   cfg.Username,
 		token:      cfg.Token,
+		authMode:   mode,
 		httpClient: httpCl,
 	}
 }
 
+// authHeader builds the Authorization header value.
+//
+//   - basic mode  → "Basic " + base64(username ":" token). For Atlassian
+//     Cloud with email + API token.
+//   - bearer mode → "Bearer " + token. For Confluence Data Center / Server
+//     Personal Access Tokens. Username is not used.
 func (c *Client) authHeader() string {
+	if c.authMode == config.AuthModeBearer {
+		return "Bearer " + c.token
+	}
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(c.username+":"+c.token))
 }
 

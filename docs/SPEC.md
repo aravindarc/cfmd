@@ -940,3 +940,37 @@ support coverage requires a table update in the same commit.
 - `README.md`: **operational reference**. Install, usage, macro table,
   diff workflow, troubleshooting.
 - Any change that affects behavior must update both.
+
+### A8. Bearer auth for Confluence Data Center / Server Personal Access Tokens (2026-04-21, v0.1.1)
+
+**Original spec (§7):** Auth is HTTP Basic with
+`Authorization: Basic base64(username:token)`. Target is Atlassian Cloud.
+
+**Amended:** Confluence has two completely different hosting models with
+different auth schemes, and cfmd now supports both:
+
+- **Atlassian Cloud** (`*.atlassian.net`): HTTP Basic with
+  `base64(email:api-token)`. Token from
+  `id.atlassian.com/manage-profile/security/api-tokens`. This is the v0.1.0
+  behavior — unchanged and still the default.
+- **Confluence Data Center / Server** (self-hosted): HTTP **Bearer** with
+  the raw Personal Access Token from the Confluence UI
+  (Profile → Personal Access Tokens). Username is not used.
+
+Selected via a new env var `CFMD_AUTH_MODE` with values `basic` (default,
+Cloud) or `bearer` (DC). In bearer mode, `CFMD_USERNAME` is optional.
+
+**Why:** v0.1.0 was built against the original spec's Cloud-only target.
+First real-world tester was on a DC instance; Basic auth with a DC PAT
+always 401s because DC expects `Authorization: Bearer <token>`. The two
+schemes have different wire formats, not just different credential sources,
+so a single code path cannot cover both.
+
+**Base URL note:** DC installations usually do *not* include the `/wiki`
+suffix that Cloud requires. Common DC forms:
+`https://wiki.company.com`, `https://wiki.company.com/confluence`,
+`https://docs.company.com`. The rule is: whatever prefix your browser URL
+has **before** `/display/`, `/spaces/`, or `/pages/`.
+
+**Backward compatibility:** `CFMD_AUTH_MODE` defaults to `basic` when
+unset, so existing v0.1.0 `.env` files continue to work unchanged on Cloud.

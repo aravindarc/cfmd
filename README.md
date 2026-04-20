@@ -222,19 +222,47 @@ Requires Go 1.21+.
 cfmd reads all configuration from the environment. No YAML, no keyring, no
 interactive setup beyond `cfmd init`, which writes a `.env` template.
 
+**Confluence has two completely different hosting models with different auth
+schemes.** Pick the one that matches your instance:
+
+### Atlassian Cloud (hosted at `*.atlassian.net`)
+
+```bash
+CFMD_BASE_URL=https://yourco.atlassian.net/wiki    # /wiki path required
+CFMD_USERNAME=you@company.com                       # account email
+CFMD_TOKEN=<Cloud API token>                        # Basic-auth token
+CFMD_AUTH_MODE=basic                                # default, can omit
+```
+
+Create a Cloud API token at
+[id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+
+### Confluence Data Center / Server (self-hosted)
+
+```bash
+CFMD_BASE_URL=https://wiki.company.com              # or /company.com/confluence
+CFMD_USERNAME=                                      # unused in bearer mode
+CFMD_TOKEN=<Data Center Personal Access Token>
+CFMD_AUTH_MODE=bearer                               # required for DC
+```
+
+Create a Data Center PAT from inside Confluence: click your avatar →
+**Profile** → **Personal Access Tokens** → **Create token**. DC uses Bearer
+auth, not Basic, so `CFMD_USERNAME` is not used.
+
+### Full env var reference
+
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CFMD_BASE_URL` | yes (for push/pull) | Confluence Cloud wiki URL, e.g. `https://yourco.atlassian.net/wiki` (no trailing slash) |
-| `CFMD_USERNAME` | yes | Account email for Basic auth |
-| `CFMD_TOKEN` | yes | Atlassian API token |
+| `CFMD_BASE_URL` | yes (for push/pull) | Confluence wiki URL, no trailing slash |
+| `CFMD_USERNAME` | yes in basic mode; unused in bearer mode | Account email (Cloud) or Confluence username (some DC) |
+| `CFMD_TOKEN` | yes | Cloud API token or DC Personal Access Token |
+| `CFMD_AUTH_MODE` | no (default `basic`) | `basic` for Cloud, `bearer` for DC PATs |
 | `CFMD_DEFAULT_SPACE` | no | Space key used when a file's frontmatter omits `space` |
 | `CFMD_DEFAULT_PARENT_ID` | no | Parent page id used when a file's frontmatter omits `parent_id` |
 | `CFMD_TIMEOUT_SECONDS` | no (default 30) | Per-request HTTP timeout |
 | `CFMD_CACHE_DIR` | no | Override cache directory (default: `$XDG_CACHE_HOME/cfmd` or `~/.cache/cfmd`) |
 | `CFMD_ALLOW_INSECURE_TLS` | no | Set to `true` to skip cert verification (debugging only) |
-
-Create an API token at
-[id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens).
 
 ### Using a `.env` file
 

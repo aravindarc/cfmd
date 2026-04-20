@@ -91,3 +91,62 @@ func TestLoad_TrimsTrailingSlash(t *testing.T) {
 		t.Errorf("trailing slash not trimmed: %q", cfg.BaseURL)
 	}
 }
+
+func TestAuthMode_DefaultsToBasic(t *testing.T) {
+	for _, k := range []string{"CFMD_AUTH_MODE"} {
+		os.Unsetenv(k)
+	}
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.AuthMode != AuthModeBasic {
+		t.Errorf("expected default basic, got %q", cfg.AuthMode)
+	}
+}
+
+func TestAuthMode_Bearer(t *testing.T) {
+	os.Setenv("CFMD_AUTH_MODE", "bearer")
+	t.Cleanup(func() { os.Unsetenv("CFMD_AUTH_MODE") })
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if cfg.AuthMode != AuthModeBearer {
+		t.Errorf("got %q", cfg.AuthMode)
+	}
+}
+
+func TestAuthMode_CaseInsensitiveAndTrimmed(t *testing.T) {
+	os.Setenv("CFMD_AUTH_MODE", " BEARER ")
+	t.Cleanup(func() { os.Unsetenv("CFMD_AUTH_MODE") })
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if cfg.AuthMode != AuthModeBearer {
+		t.Errorf("not normalized: %q", cfg.AuthMode)
+	}
+}
+
+func TestAuthMode_Invalid(t *testing.T) {
+	os.Setenv("CFMD_AUTH_MODE", "digest")
+	t.Cleanup(func() { os.Unsetenv("CFMD_AUTH_MODE") })
+	if _, err := Load(); err == nil {
+		t.Errorf("expected error for invalid auth mode")
+	}
+}
+
+func TestRequireAuth_BearerDoesNotRequireUsername(t *testing.T) {
+	c := &Config{BaseURL: "https://x", Token: "t", AuthMode: AuthModeBearer}
+	if err := c.RequireAuth(); err != nil {
+		t.Errorf("bearer should not require username, got %v", err)
+	}
+}
+
+func TestRequireAuth_BasicRequiresUsername(t *testing.T) {
+	c := &Config{BaseURL: "https://x", Token: "t", AuthMode: AuthModeBasic}
+	if err := c.RequireAuth(); err == nil {
+		t.Errorf("basic should require username")
+	}
+}
